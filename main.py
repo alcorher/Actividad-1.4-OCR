@@ -6,7 +6,6 @@ from PIL import Image
 import re
 import csv
 
-
 img = cv2.imread('image.png')
 alto, ancho = img.shape[:2]
 
@@ -59,22 +58,31 @@ plt.show()
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 pil_img = Image.fromarray(binary)
-texto = pytesseract.image_to_string(pil_img)
-print("Texto bruto reconocido por Tesseract:\n", texto)
+texto = pytesseract.image_to_string(pil_img, config='--psm 6')
+print("Texto bruto:\n", texto)
 
 # Eliminar errores con números
 def limpiar_numero_ocr(valor):
-    reemplazos = {
+    # 1. Reemplazos completo (Evita errores al leer números)
+    reemplazos_completos = {
         ']': '1', '[': '1', 'I': '1', 'l': '1', '|': '1', '!': '1', 'i': '1',
-        'N': '11', 'ii': '11', 'II': '11', 'll': '11', 'H': '11', 'u': '11',
+        'N': '11', 'NN': '11', 'nn': '11', 'ii': '11', 'II': '11', 'll': '11', 'H': '11', 'HH': '11', 'u': '11',
+        'O': '0', 'o': '0', 'D': '0', 'Q': '0',
+        'S': '5', 's': '5', 'SS': '5', 'ss': '5',
+        'B': '8', 'Z': '2', 'z': '2', 'A': '4',
+        'G': '6', 'g': '9', 'gg': '9', 'q': '9'
+    }
+    if valor in reemplazos_completos:
+        return reemplazos_completos[valor]
+    
+    # 2. Reemplazo carácter a carácter (Evita errores al leer números)
+    reemplazos_char = {
+        ']': '1', '[': '1', 'I': '1', 'l': '1', '|': '1', '!': '1', 'i': '1',
         'O': '0', 'o': '0', 'D': '0', 'Q': '0',
         'S': '5', 's': '5', 'B': '8', 'Z': '2', 'z': '2', 'A': '4', 'G': '6', 'g': '9'
     }
-    if valor in reemplazos:
-        return reemplazos[valor]
-    limpio = "".join(reemplazos.get(c, c) for c in valor)
-    digitos = re.sub(r'\D', '', limpio)
-    return digitos
+    limpio = "".join(reemplazos_char.get(c, c) for c in valor)
+    return re.sub(r'\D', '', limpio)
 
 cabeceras = ['POS', 'EQUIPO', 'PTS', 'PJ', 'PG', 'PE', 'PP', 'GF', 'GC', 'TA', 'TR']
 filas_estructuradas = []
@@ -86,7 +94,7 @@ for linea in texto.splitlines():
     
     partes = linea.split()
 
-    # Solo procesar líneas con al menos 10 partes (equipo + 9 estadísticas)
+    # Solo procesar líneas con al menos 10 partes (equipo + estadísticas)
     if len(partes) >= 10:
         # Leemos de derecha a izquierda para obtener las estadísticas (Lo demás es el nombre del equipo)
         estadisticas_brutas = partes[-9:]
@@ -94,15 +102,14 @@ for linea in texto.splitlines():
         
         if all(col.isdigit() for col in estadisticas_limpias):
             parte_izquierda = " ".join(partes[:-9])
-            equipo = re.sub(r'^[\d\W_]+', '', parte_izquierda).strip()
+            # Elimina todo lo que haya antes de la primera mayúscula seguida de minúscula. (Antes de Donostia añadia un iH)
+            equipo = re.sub(r'^.*?(?=[A-Z][a-z])', '', parte_izquierda).strip()
             pos = str(len(filas_estructuradas) + 1)
             filas_estructuradas.append([pos, equipo] + estadisticas_limpias)
 
-
-
 archivo_csv = 'clasificacion_liga.csv'
 
-with open(archivo_csv, mode='w', newline='', encoding='utf-8') as f:
+with open(archivo_csv, mode='w', newline='', encoding='utf-8-sig') as f:
     escritor = csv.writer(f, delimiter=';')
     escritor.writerow(cabeceras)
     escritor.writerows(filas_estructuradas)

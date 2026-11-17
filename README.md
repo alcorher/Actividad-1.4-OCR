@@ -1,67 +1,85 @@
-# Actividad 1.4: extracción de una clasificación de liga mediante OCR
+# Actividad 1.4: extracción de una clasificación mediante OCR
 
-Este proyecto procesa una imagen con una tabla de clasificación de fútbol y
-extrae sus datos usando OCR (reconocimiento óptico de caracteres). El resultado
-se guarda en `clasificacion_liga.csv`.
+Este proyecto extrae la clasificación de una liga de fútbol a partir de
+`image.png`. La imagen se preprocesa con OpenCV y el texto se reconoce con
+Tesseract OCR. Finalmente, las filas detectadas se exportan a
+`clasificacion_liga.csv`.
+
+> **Importante:** el OCR no garantiza resultados perfectos. Conviene revisar
+> el CSV generado, especialmente cuando la imagen tiene texto pequeño,
+> símbolos o nombres de equipos poco habituales.
 
 ## Requisitos
 
 - Windows.
-- Python 3.14 o superior.
+- Python 3.14 o una versión compatible con `pyproject.toml`.
 - [`uv`](https://docs.astral.sh/uv/), para crear el entorno e instalar las
-  dependencias de Python.
-- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract), instalado en:
-  `C:\Program Files\Tesseract-OCR\tesseract.exe`.
+  dependencias.
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract).
 
-El programa utiliza `opencv-python`, `matplotlib`, `Pillow` y `pytesseract`.
-Las dependencias Python están declaradas en `pyproject.toml` y fijadas en
-`uv.lock`.
+El programa espera encontrar Tesseract en:
+
+```text
+C:\Program Files\Tesseract-OCR\tesseract.exe
+```
+
+Si se instala en otra ubicación, hay que actualizar `tesseract_cmd` en
+`main.py`.
+
+Las dependencias de Python son `opencv-python`, `matplotlib`, `Pillow` y
+`pytesseract`. Están declaradas en `pyproject.toml` y fijadas en `uv.lock`.
 
 ## Instalación
 
-Desde la carpeta del proyecto:
+Abre PowerShell en la carpeta del proyecto y ejecuta:
 
 ```powershell
 uv sync
 ```
 
-Si Tesseract está instalado en otra ubicación, modifica la asignación
-`pytesseract.pytesseract.tesseract_cmd` de `main.py` para indicar la ruta
-correcta al ejecutable.
-
-## Ejecución
-
-La imagen de entrada debe llamarse `image.png` y estar en la raíz del proyecto.
-Ejecuta:
+Comprueba también que Tesseract está instalado:
 
 ```powershell
-uv run python main.py
+& "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
 ```
 
-El programa:
+## Uso
 
-1. Carga `image.png`.
-2. Recorta la cabecera de la tabla.
-3. Convierte la imagen a escala de grises.
-4. Elimina la zona de escudos y flechas.
-5. Amplía la imagen 2,5 veces.
-6. Aplica una binarización mediante el método de Otsu.
-7. Muestra las etapas del preprocesamiento.
-8. Extrae el texto con Tesseract usando la configuración `--psm 6`.
-9. Limpia errores frecuentes del OCR en valores numéricos.
-10. Guarda las filas detectadas en `clasificacion_liga.csv`.
+1. Coloca la imagen de entrada en la raíz del proyecto y llámala `image.png`.
+2. Ejecuta el programa desde esa misma carpeta:
 
-Durante la ejecución se abre una ventana de Matplotlib con las imágenes
-intermedias y se imprime en la consola el texto reconocido y las filas
-generadas.
+   ```powershell
+   uv run python main.py
+   ```
 
-## Archivo de salida
+3. Cierra la ventana de Matplotlib cuando quieras continuar con la
+   generación del CSV.
 
-`clasificacion_liga.csv` utiliza `;` como separador. Contiene las siguientes columnas:
+El programa realiza estas etapas:
+
+1. Carga la imagen y elimina la cabecera.
+2. Convierte la región de interés a escala de grises.
+3. Oculta la zona de escudos y flechas.
+4. Amplía la imagen 2,5 veces.
+5. Aplica una binarización mediante el método de Otsu.
+6. Muestra las imágenes intermedias para poder revisar el preprocesamiento.
+7. Reconoce el texto con Tesseract usando `--psm 6`.
+8. Corrige algunos errores frecuentes en valores numéricos.
+9. Guarda las filas detectadas en `clasificacion_liga.csv`.
+
+Las rutas de `image.png` y `clasificacion_liga.csv` son relativas a la
+carpeta desde la que se ejecuta el comando. El CSV se sobrescribe en cada
+ejecución; si no se detecta ninguna fila válida, contiene únicamente la
+cabecera.
+
+## Formato del CSV
+
+El fichero usa `;` como separador y codificación UTF-8 con BOM. Sus columnas
+son:
 
 | Columna | Descripción |
 | --- | --- |
-| `POS` | Posición del equipo |
+| `POS` | Posición en la clasificación |
 | `EQUIPO` | Nombre del equipo |
 | `PTS` | Puntos |
 | `PJ` | Partidos jugados |
@@ -73,21 +91,24 @@ generadas.
 | `TA` | Tarjetas amarillas |
 | `TR` | Tarjetas rojas |
 
-El fichero se sobrescribe en cada ejecución. Si no se detectan filas válidas,
-se conserva únicamente la cabecera.
+La posición (`POS`) se asigna según el orden de las filas reconocidas, no se
+calcula a partir de los puntos.
 
-## Ajustes y solución de problemas
+## Solución de problemas
 
-- **No se encuentra Tesseract:** comprueba que existe el ejecutable indicado o
-  actualiza `tesseract_cmd`.
-- **No se encuentra `image.png`:** coloca la imagen en la raíz del proyecto o
-  cambia la ruta usada en `cv2.imread`.
-- **Resultados OCR incorrectos:** revisa la imagen binarizada y ajusta el
-  recorte, la zona de escudos, el escalado o la configuración `--psm 6`.
-- **La ventana de visualización bloquea el proceso:** cierra la ventana de
-  Matplotlib para continuar con la generación del CSV.
+- **No se encuentra Tesseract:** instala Tesseract o cambia
+  `pytesseract.pytesseract.tesseract_cmd` en `main.py`.
+- **No se encuentra `image.png`:** coloca la imagen en la carpeta de ejecución
+  o ejecuta el comando desde la raíz del proyecto.
+- **El OCR confunde números o nombres:** revisa la imagen binarizada que se
+  muestra en pantalla y ajusta el recorte, la zona eliminada, el escalado o
+  la configuración `--psm 6`.
+- **La ventana de visualización parece bloqueada:** ciérrala para que el
+  programa continúe con el reconocimiento y la escritura del CSV.
+- **El CSV contiene datos incorrectos:** corrige manualmente las filas o
+  mejora el preprocesamiento antes de usar los datos en otro proceso.
 
-## Estructura
+## Estructura del proyecto
 
 ```text
 .
